@@ -1,0 +1,4 @@
+inputs/*.wav
+inputs/*.mp4
+Voice_npy/*.npy
+.venv/*
