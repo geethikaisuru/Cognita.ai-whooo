@@ -11,6 +11,17 @@ from reportlab.pdfgen import canvas
 import re
 import requests
 import json
+import textwrap
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.units import inch
+from reportlab.platypus.flowables import KeepTogether
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib import colors
+
 
 print("Successfully imported all libraries")
 
@@ -79,29 +90,66 @@ def identify_topics(preprocessed_text):
     return topics
 
 def format_question_paper(questions):
-    paper = "Model Paper Generated locally.\n ----------------------------------\n"
+    paper = "Model Question Paper\n\n"
     for i, question in enumerate(questions, 1):
-        paper += f"{i}. {question}\n\n"
+        wrapped_question = textwrap.fill(question, width=80, subsequent_indent='    ')
+        paper += f"{i}. {wrapped_question}\n\n"
+    return paper
+
+def format_question_paper(questions):
+    paper = "Model Question Paper\n\n"
+    for i, question in enumerate(questions, 1):
+        wrapped_question = textwrap.fill(question, width=80, subsequent_indent='    ')
+        paper += f"{i}. {wrapped_question}\n\n"
     return paper
 
 def save_as_pdf(text, filename):
-    c = canvas.Canvas(filename, pagesize=letter)
-    width, height = letter
+    doc = SimpleDocTemplate(filename, pagesize=letter,
+                            leftMargin=inch, rightMargin=inch,
+                            topMargin=inch, bottomMargin=inch)
+    styles = getSampleStyleSheet()
     
-    # Split the text into lines
-    lines = text.split('\n')
+    # Create a custom style for questions
+    styles.add(ParagraphStyle(name='Question',
+                              parent=styles['Normal'],
+                              fontSize=11,
+                              leading=14,
+                              leftIndent=20,
+                              rightIndent=20,
+                              firstLineIndent=-20,
+                              alignment=TA_JUSTIFY,
+                              spaceAfter=12))
+
+    # Modify the existing Title style
+    styles['Title'].fontSize = 16
+    styles['Title'].alignment = 1  # Center alignment
+    styles['Title'].spaceAfter = 0.5*inch
+
+    flowables = []
+
+    # Add title
+    flowables.append(Paragraph("Model Question Paper", styles['Title']))
+    flowables.append(Spacer(1, 0.25*inch))
+
+    # Split the text into questions and remove any empty or invalid questions
+    questions = [q.strip() for q in text.split('\n\n')[1:] if q.strip() and not q.strip().isdigit()]
     
-    y = height - 40  # Start near the top of the page
-    for line in lines:
-        # If we're near the bottom of the page, start a new page
-        if y < 40:
-            c.showPage()
-            y = height - 40
-        
-        c.drawString(40, y, line)
-        y -= 15  # Move down for the next line
-    
-    c.save()
+    for i, question in enumerate(questions, 1):
+        # Remove the leading number if it exists
+        q = re.sub(r'^\d+\.\s*', '', question)
+        q = f"{i}. {q}"
+        flowables.append(KeepTogether(Paragraph(q, styles['Question'])))
+
+    # Create a border around the page
+    def add_border(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.black)
+        canvas.setLineWidth(1)
+        canvas.rect(doc.leftMargin, doc.bottomMargin,
+                    doc.width, doc.height, stroke=1, fill=0)
+        canvas.restoreState()
+
+    doc.build(flowables, onFirstPage=add_border, onLaterPages=add_border)
 
 def generate_questions(context, num_questions):
     generated_questions = []
@@ -133,8 +181,9 @@ def filter_and_rank_questions(generated_questions, original_questions, topics):
         if len(processed_question.split()) >= 5 and processed_question not in filtered_questions:
             filtered_questions.append(processed_question)
     
-    # Limit to 20 questions
-    filtered_questions = filtered_questions[:20]
+    # Limit to the number of questions in the original papers
+    num_original_questions = len(original_questions)
+    filtered_questions = filtered_questions[:num_original_questions]
     
     print(f"Filtered to {len(filtered_questions)} questions")
     return filtered_questions
@@ -172,7 +221,7 @@ def main(pdf_files):
     print(f"Identified {len(topics)} topics")
     
     print("Generating questions...")
-    generated_questions = generate_questions(' '.join(preprocessed_text), num_questions=50)
+    generated_questions = generate_questions(' '.join(preprocessed_text), num_questions=len(analyzed_questions) * 2)  # Generate more questions than needed
     
     print("Filtering and ranking questions...")
     filtered_questions = filter_and_rank_questions(generated_questions, analyzed_questions, topics)
@@ -181,7 +230,7 @@ def main(pdf_files):
     final_paper = format_question_paper(filtered_questions)
     
     print("Saving question paper as PDF...")
-    save_as_pdf(final_paper, "model_paperLocalOllama2.pdf")
+    save_as_pdf(final_paper, "localmodelpaperStyledPhi3.pdf")
     
     return final_paper
 
