@@ -180,14 +180,87 @@ def generate_questions(context, num_questions):
     return generated_questions
 
 def filter_and_rank_questions(generated_questions, original_questions, topics):
-    if not generated_questions:
-        print("No questions to filter.")
-        return []
+    filtered_questions = []
+    for question in generated_questions:
+        processed_question = post_process_question(question)
+        if len(processed_question.split()) >= 5 and processed_question not in filtered_questions:
+            filtered_questions.append(processed_question)
     
-    filtered_questions = generated_questions[:20]  # Just take the first 20 questions without filtering
+    # Limit to 20 questions
+    filtered_questions = filtered_questions[:20]
     
     print(f"Filtered to {len(filtered_questions)} questions")
     return filtered_questions
+
+def post_process_question(question):
+    # Remove 'question:' prefix if present
+    question = re.sub(r'^(question:\s*)', '', question, flags=re.IGNORECASE)
+    
+    # Capitalize the first letter
+    question = question.capitalize()
+    
+    # Ensure the question ends with a question mark
+    if not question.endswith('?'):
+        question += '?'
+    
+    return question
+
+def format_question_paper(questions):
+    paper = "Model Question Paper\n\n"
+    for i, question in enumerate(questions, 1):
+        paper += f"{i}. {question}\n\n"
+    return paper
+
+def generate_questions(context, num_questions):
+    model = T5ForConditionalGeneration.from_pretrained('t5-small')
+    tokenizer = T5Tokenizer.from_pretrained('t5-small')
+    
+    generated_questions = []
+    for i in range(num_questions):
+        start_idx = i * 100 % len(context)
+        input_text = f"generate question: {context[start_idx:start_idx+200]}"
+        input_ids = tokenizer.encode(input_text, return_tensors='pt', max_length=512, truncation=True)
+        
+        outputs = model.generate(input_ids, max_length=64, num_return_sequences=1, num_beams=4)
+        question = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        generated_questions.append(question)
+    
+    print(f"Generated {len(generated_questions)} questions")
+    return generated_questions
+
+def post_process_question(question):
+    # Remove 'question:' prefix if present
+    question = re.sub(r'^(question:\s*)', '', question, flags=re.IGNORECASE)
+    
+    # Capitalize the first letter
+    question = question.capitalize()
+    
+    # Ensure the question ends with a question mark
+    if not question.endswith('?'):
+        question += '?'
+    
+    return question
+
+def filter_and_rank_questions(generated_questions, original_questions, topics):
+    filtered_questions = []
+    for question in generated_questions:
+        processed_question = post_process_question(question)
+        if len(processed_question.split()) >= 5 and processed_question not in filtered_questions:
+            filtered_questions.append(processed_question)
+    
+    # Limit to 20 questions
+    filtered_questions = filtered_questions[:20]
+    
+    print(f"Filtered to {len(filtered_questions)} questions")
+    return filtered_questions
+
+def format_question_paper(questions):
+    paper = "Model Question Paper\n\n"
+    for i, question in enumerate(questions, 1):
+        paper += f"{i}. {question}\n\n"
+    return paper
+
+print("Completed functions compiling")
 
 def main(pdf_files):
     print("Extracting text from PDFs...")
@@ -220,7 +293,6 @@ def main(pdf_files):
     
     return final_paper
 
-# Usage
 pdf_files = ['./PGenInputs/Papers/DBTutorial1.pdf', './PGenInputs/Papers/DBTutorial2.pdf', './PGenInputs/Papers/DBTutorial3.pdf']
 model_paper = main(pdf_files)
 print("Model paper generation complete. Output saved as 'model_paper.pdf'.")
