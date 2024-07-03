@@ -1,5 +1,6 @@
 import PyPDF2
 import nltk
+import sys
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize, sent_tokenize
 import spacy
@@ -234,8 +235,15 @@ def main(pdf_files):
     
     return final_paper
 
-pdf_files = ['./PGenInputs/Papers/DBTutorial1.pdf', './PGenInputs/Papers/DBTutorial2.pdf', './PGenInputs/Papers/DBTutorial3.pdf']
+if __name__ == "__main__":
+    pdf_files = sys.argv[1:]
+    model_paper = main(pdf_files)
+    print("Model paper generation complete. Output saved as 'model_paper.pdf'.")
+    print("\nGenerated Model Paper:")
+    print(model_paper)
+
+"""pdf_files = ['./PGenInputs/Papers/DBTutorial1.pdf', './PGenInputs/Papers/DBTutorial2.pdf', './PGenInputs/Papers/DBTutorial3.pdf']
 model_paper = main(pdf_files)
 print("Model paper generation complete. Output saved as 'model_paper.pdf'.")
 print("\nGenerated Model Paper:")
-print(model_paper)
+print(model_paper)"""
